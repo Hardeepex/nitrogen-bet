@@ -16,6 +16,7 @@
 import requests
 import csv
 from bet_type import BetType
+from bet import Bet
 from metric_set import MetricSet
 
 # Retrieve current Bitcoin spot price via Coinbase
@@ -28,8 +29,8 @@ bankroll = 0.15
 # Main functin to kick off program
 def main():
 
-    betslips = get_data()
-    analyze(betslips)
+    bets = get_data()
+    analyze(bets)
 
 # Function that performs the main analysis
 def analyze(betslips):
@@ -55,12 +56,15 @@ def analyze(betslips):
 
         betType = get_bet_type(bet)
 
-        if (betType == BetType.ML):
-            update_metrics(ml_metrics, bet)
-        elif (betType == BetType.SPREAD):
-            update_metrics(spread_metrics, bet)
-        else: 
-            update_metrics(over_under_metrics, bet)
+        if bet.bet_type == BetType.ML:
+            bet.calculate_bet_size(ml_metrics)
+            bet.calculate_net_profit(ml_metrics)
+        elif bet.bet_type == BetType.SPREAD:
+            bet.calculate_bet_size(spread_metrics)
+            bet.calculate_net_profit(spread_metrics)
+        else:
+            bet.calculate_bet_size(over_under_metrics)
+            bet.calculate_net_profit(over_under_metrics)
 
     print("Bitcoin : $" + str(BTC))
     print("Bankroll : $" + str(bankroll * BTC))
@@ -100,6 +104,23 @@ def update_metrics(metric_set, bet):
             metric_set.subtract_net_profit(bet[10])
         metric_set.add_bet_size(bet[9])
 
+# New function to analyze parlay bets
+def analyze_parlays(bets):
+    grouped_bets = {}
+    for bet in bets:
+        if bet.bet_type == BetType.PARLAY:
+            bet_id = bet.betslip_id
+            if bet_id not in grouped_bets:
+                grouped_bets[bet_id] = []
+            grouped_bets[bet_id].append(bet)
+
+    parlay_results = {}
+    for bet_id, bets in grouped_bets.items():
+        # Calculate parlay results based on the group of bets
+        # This logic should be implemented according to how parlay bets are calculated
+        parlay_results[bet_id] = 'TODO: calculate parlay result'
+    return parlay_results
+
 # Function that takes in a metricSet and prints all relevant stats
 def print_metrics(metric_set, unit_size):
 
@@ -126,15 +147,19 @@ def print_metrics(metric_set, unit_size):
     print(pos_or_neg + unit_string + " units")
     print("-------------------")
 
-# Function to open csv of data and parse it into a list of betslips
+# Function to open csv of data and parse it into a list of Bet objects
 def get_data():
 
     f = open('MyWagers.csv', 'r')
     data = csv.reader(f, delimiter=',')
-    betslips = []
+    bets = []
+    next(data)  # Skip header line
     for line in data:
-        betslips.append(line)
-    return betslips
+        if line[0] != 'Status': # Skip header
+            bet_obj = Bet(bet_type=line[1], date=line[2], sport=line[3], league=line[4], event=line[5], wager=float(line[6]), odds=float(line[7]), risk=float(line[8]), result=line[0])
+            bets.append(bet_obj)
+    f.close()
+    return bets
  
 if __name__ == '__main__':
     main()
